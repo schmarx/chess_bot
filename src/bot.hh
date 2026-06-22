@@ -1,0 +1,136 @@
+#include "../../chess_engine/src/globals.hh"
+
+#include <algorithm>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+namespace chess {
+
+class move_score {
+  public:
+	int score;
+	Move move;
+};
+
+bool sorter(move_score a, move_score b) {
+	return a.score > b.score;
+}
+
+class bot {
+  public:
+	int client;
+	bool running = true;
+
+	Board board;
+	COLOR me;
+
+	bool register_listen() {
+		client = socket(AF_INET, SOCK_STREAM, 0);
+		sockaddr_in addr;
+
+		addr.sin_port = htons(PORT);
+		addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_family = AF_INET;
+
+		int conn = connect(client, (sockaddr *)&addr, sizeof(addr));
+
+		if (conn < 0) {
+			printf("err\n");
+			return false;
+		}
+
+		int buf[TCP_BUF_LEN];
+		int res = recv(client, buf, TCP_BUF_LEN, 0);
+		me = (COLOR)buf[0];
+
+		printf("playing as %s\n", color_codes[me]);
+
+		fcntl(client, F_SETFL, O_NONBLOCK);
+
+		return true;
+
+		// printf("continue?");
+		// char c;
+		// scanf("%c", &c);
+
+		// const char *msg = "sending message beep boop";
+		// send(client, msg, strlen(msg), 0);
+		// printf("sending \"%s\" of length %li\n", msg, strlen(msg));
+	}
+
+	void listen() {
+		int buf[TCP_BUF_LEN];
+		int res = recv(client, buf, TCP_BUF_LEN, 0);
+
+		if (res == 0) {
+			// inactive connection
+			printf("connection lost\n");
+			running = false;
+
+		} else if (res < 0) {
+			// error occured
+
+			if (no_msg()) {
+				// the error is only signifying that there are no packets to poll for
+			} else {
+				printf("err\n");
+			}
+		} else {
+			// a response consisting of res bytes is received
+			printf("received board\n");
+			binary_to_board(board, buf);
+			play();
+		}
+	}
+
+	int stage(Move move) {
+		Board staging_board = board;
+		staging_board.stage = false; // the staging board should not recursively stage more boards
+		staging_board.commit(move);
+		staging_board.next_turn();
+		return staging_board.get_score();
+
+		// std::vector<Move> moves = staging_board.get_valid_moves();
+
+		// // check if the move allows the opponent to take the king
+		// for (size_t i = 0; i < moves.size(); i++) {
+		// 	if (staging_board[moves[i].end].type == PIECE_KING) return false;
+		// }
+
+		// return true;
+	}
+
+	void play() {
+		if (board.player_turn == me) {
+			std::vector<Move> moves = board.get_valid_moves();
+			int score = board.get_score();
+
+			std::vector<move_score> move_scores;
+			for (size_t i = 0; i < moves.size(); i++) {
+				move_score ms;
+				ms.move = moves[i];
+				ms.score = stage(moves[i]);
+				move_scores.push_back(ms);
+			}
+
+			std::sort(move_scores.begin(), move_scores.end(), sorter);
+
+			char buf[20];
+			move_scores[0].move.to_string(buf);
+			send(client, buf, 20, 0);
+		}
+	}
+
+	void run() {
+		while (running) {
+			listen();
+		}
+	}
+};
+
+} // namespace chess
