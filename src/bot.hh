@@ -65,7 +65,7 @@ class bot {
 
 	void listen() {
 		int buf[TCP_BUF_LEN];
-		int res = recv(client, buf, TCP_BUF_LEN, 0);
+		int res = recv(client, buf, sizeof(packet), 0);
 
 		if (res == 0) {
 			// inactive connection
@@ -83,7 +83,7 @@ class bot {
 		} else {
 			// a response consisting of res bytes is received
 			printf("received board\n");
-			binary_to_board(board, buf);
+			packet_to_board(board, *((packet *)buf));
 			play();
 		}
 	}
