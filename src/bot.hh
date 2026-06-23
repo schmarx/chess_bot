@@ -27,7 +27,6 @@ class bot {
 	bool running = true;
 
 	Board board;
-	COLOR me;
 
 	bool register_listen() {
 		client = socket(AF_INET, SOCK_STREAM, 0);
@@ -43,12 +42,6 @@ class bot {
 			printf("err\n");
 			return false;
 		}
-
-		int buf[TCP_BUF_LEN];
-		int res = recv(client, buf, TCP_BUF_LEN, 0);
-		me = (COLOR)buf[0];
-
-		printf("playing as %s\n", color_codes[me]);
 
 		fcntl(client, F_SETFL, O_NONBLOCK);
 
@@ -106,9 +99,15 @@ class bot {
 	}
 
 	void play() {
-		if (board.player_turn == me) {
+		if (board.player_turn == board.me) {
 			std::vector<Move> moves = board.get_valid_moves();
 			int score = board.get_score();
+
+			if (moves.size() == 0) {
+				running = false;
+				printf("lost\n");
+				return;
+			}
 
 			std::vector<move_score> move_scores;
 			for (size_t i = 0; i < moves.size(); i++) {
