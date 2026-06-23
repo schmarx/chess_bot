@@ -110,11 +110,15 @@ class bot {
 		return v2;
 	}
 
+	int heuristic(Board &board) {
+		return board.get_score() * 1000 + board.protected_pieces();
+	}
+
 	int ab(Board &board, int a, int b, int depth) {
 		// beta minimizes, alpha maximizes
 
 		if (depth == 0) {
-			return board.get_score();
+			return heuristic(board);
 		}
 
 		int score;
@@ -172,34 +176,37 @@ class bot {
 
 			// std::sort(move_scores.begin(), move_scores.end(), sorter);
 
-			int best = 0;
-			int best_score = INT_MIN;
-			int worst = 0;
-			int worst_score = INT_MAX;
+			int high = 0;
+			int high_score = INT_MIN;
+			int low = 0;
+			int low_score = INT_MAX;
 			for (size_t i = 0; i < moves.size(); i++) {
 				Board result = board;
 				result.stage = false;
 				result.commit(moves[i]);
 				result.next_turn();
-				int score = ab(result, INT_MIN, INT_MAX, 5);
+				int score = ab(result, INT_MIN, INT_MAX, 4);
 
-				if (score > best_score) {
-					best = i;
-					best_score = score;
+				if (score > high_score) {
+					high = i;
+					high_score = score;
 				}
-				if (score < worst_score) {
-					worst = i;
-					worst_score = score;
+				if (score < low_score) {
+					low = i;
+					low_score = score;
 				}
 			}
+
+			int best = high;
+			if (board.me == BLACK) best = low;
 
 			char buf[20];
 			moves[best].to_string(buf);
 			send(client, buf, 20, 0);
 
-			printf("best:  %s (%i)\n", buf, best_score);
-			moves[worst].to_string(buf);
-			printf("worst: %s (%i)\n", buf, worst_score);
+			// printf("best:  %s (%i)\n", buf, best_score);
+			// moves[worst].to_string(buf);
+			// printf("worst: %s (%i)\n", buf, worst_score);
 		}
 	}
 
