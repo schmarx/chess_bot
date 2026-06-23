@@ -1,6 +1,8 @@
 #include "../../chess_engine/src/globals.hh"
 
 #include <algorithm>
+#include <climits>
+#include <stdlib.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -98,10 +100,61 @@ class bot {
 		// return true;
 	}
 
+	int max(int v1, int v2) {
+		if (v1 > v2) return v1;
+		return v2;
+	}
+
+	int min(int v1, int v2) {
+		if (v1 < v2) return v1;
+		return v2;
+	}
+
+	int ab(Board &board, int a, int b, int depth) {
+		// beta minimizes, alpha maximizes
+
+		if (depth == 0) {
+			return board.get_score();
+		}
+
+		int score;
+		std::vector<Move> moves = board.get_valid_moves();
+
+		if (board.player_turn == WHITE) {
+			score = INT_MIN;
+
+			for (size_t i = 0; i < moves.size(); i++) {
+				Board result = board;
+				result.stage = false;
+				result.commit(moves[i]);
+				result.next_turn();
+
+				score = max(score, ab(result, a, b, depth - 1));
+				if (score >= b) break;
+				a = max(a, score);
+			}
+			return score;
+		} else {
+			score = INT_MAX;
+
+			for (size_t i = 0; i < moves.size(); i++) {
+				Board result = board;
+				result.stage = false;
+				result.commit(moves[i]);
+				result.next_turn();
+
+				score = min(score, ab(result, a, b, depth - 1));
+				if (score <= a) break;
+				b = min(b, score);
+			}
+		}
+
+		return score;
+	}
+
 	void play() {
 		if (board.player_turn == board.me) {
 			std::vector<Move> moves = board.get_valid_moves();
-			int score = board.get_score();
 
 			if (moves.size() == 0) {
 				running = false;
@@ -109,19 +162,44 @@ class bot {
 				return;
 			}
 
-			std::vector<move_score> move_scores;
+			// std::vector<move_score> move_scores;
+			// for (size_t i = 0; i < moves.size(); i++) {
+			// 	move_score ms;
+			// 	ms.move = moves[i];
+			// 	ms.score = stage(moves[i]);
+			// 	move_scores.push_back(ms);
+			// }
+
+			// std::sort(move_scores.begin(), move_scores.end(), sorter);
+
+			int best = 0;
+			int best_score = INT_MIN;
+			int worst = 0;
+			int worst_score = INT_MAX;
 			for (size_t i = 0; i < moves.size(); i++) {
-				move_score ms;
-				ms.move = moves[i];
-				ms.score = stage(moves[i]);
-				move_scores.push_back(ms);
+				Board result = board;
+				result.stage = false;
+				result.commit(moves[i]);
+				result.next_turn();
+				int score = ab(result, INT_MIN, INT_MAX, 5);
+
+				if (score > best_score) {
+					best = i;
+					best_score = score;
+				}
+				if (score < worst_score) {
+					worst = i;
+					worst_score = score;
+				}
 			}
 
-			std::sort(move_scores.begin(), move_scores.end(), sorter);
-
 			char buf[20];
-			move_scores[0].move.to_string(buf);
+			moves[best].to_string(buf);
 			send(client, buf, 20, 0);
+
+			printf("best:  %s (%i)\n", buf, best_score);
+			moves[worst].to_string(buf);
+			printf("worst: %s (%i)\n", buf, worst_score);
 		}
 	}
 
