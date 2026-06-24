@@ -112,15 +112,16 @@ class bot {
 		return v2;
 	}
 
-	int heuristic(Board &board) {
-		return board.get_score() * 1000 + board.protected_pieces();
+	int heuristic(Board &board, int change) {
+		// TODO: avoid trades if score is behind
+		return change * 1000 + board.protected_pieces();
 	}
 
-	int ab(Board &board, int a, int b, int depth) {
+	int ab(Board &board, int a, int b, int depth, int change) {
 		// beta minimizes, alpha maximizes
 
 		if (depth == 0) {
-			return heuristic(board);
+			return heuristic(board, change);
 		}
 
 		int score;
@@ -132,10 +133,10 @@ class bot {
 			for (size_t i = 0; i < moves.size(); i++) {
 				Board result = board;
 				result.stage = false;
-				result.commit(moves[i]);
+				int next_change = result.commit(moves[i]);
 				result.next_turn();
 
-				score = max(score, ab(result, a, b, depth - 1));
+				score = max(score, ab(result, a, b, depth - 1, change + next_change));
 				if (score >= b) break;
 				a = max(a, score);
 			}
@@ -146,10 +147,10 @@ class bot {
 			for (size_t i = 0; i < moves.size(); i++) {
 				Board result = board;
 				result.stage = false;
-				result.commit(moves[i]);
+				int next_change = result.commit(moves[i]);
 				result.next_turn();
 
-				score = min(score, ab(result, a, b, depth - 1));
+				score = min(score, ab(result, a, b, depth - 1, change + next_change));
 				if (score <= a) break;
 				b = min(b, score);
 			}
@@ -187,6 +188,8 @@ class bot {
 
 			// std::sort(move_scores.begin(), move_scores.end(), sorter);
 
+			int max_depth = 5;
+
 			int high = 0;
 			int high_score = INT_MIN;
 			int low = 0;
@@ -194,9 +197,10 @@ class bot {
 			for (size_t i = 0; i < moves.size(); i++) {
 				Board result = board;
 				result.stage = false;
-				result.commit(moves[i]);
+				int change = result.commit(moves[i]);
 				result.next_turn();
-				int score = ab(result, INT_MIN, INT_MAX, 4);
+
+				int score = ab(result, INT_MIN, INT_MAX, max_depth, change);
 
 				if (score > high_score) {
 					high = i;
