@@ -28,6 +28,8 @@ class bot {
 	int client;
 	bool running = true;
 
+	bool first_move = true;
+
 	Board board;
 
 	bool register_listen() {
@@ -164,6 +166,15 @@ class bot {
 				running = false;
 				printf("lost\n");
 				return;
+			}
+
+			if (first_move) {
+				if (board.last_move.start.x == -1 && board.last_move.start.y == -1) {
+					char buf[20];
+					Move(Pos(4, 1), Pos(4, 3)).to_string(buf); // move king's pawn
+					send(client, buf, 20, 0);
+				}
+				first_move = false;
 			}
 
 			// std::vector<move_score> move_scores;
